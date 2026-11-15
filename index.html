@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Running Analyzer — Workout & Splits</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js" defer></script>
+  <script src="app.js" defer></script>
+  <style>
+    *{box-sizing:border-box}body{margin:0;background:#f3f6fb;color:#192438;font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+    .container{max-width:1040px;margin:auto;padding:30px 16px 80px}h1{font-size:clamp(29px,4vw,42px);margin:0}h2{font-size:23px;margin:0 0 12px}h3{margin:0 0 8px}
+    .muted,.subtitle{color:#607089}.card{background:white;border-radius:16px;padding:24px;margin:20px 0;box-shadow:0 4px 15px #17273d09}
+    .tabs{display:flex;gap:10px;flex-wrap:wrap;margin:24px 0}.tab{background:#e5ecf7;color:#243755}.tab.active{background:#3478f6;color:#fff}
+    label{display:block;font-weight:600;margin:14px 0 5px}input,select{max-width:100%;font:inherit;padding:9px;border:1px solid #cbd5e1;border-radius:8px}
+    input[type=file]{display:block;width:100%;background:#fff}.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px}
+    button{border:0;border-radius:8px;padding:11px 18px;cursor:pointer;background:#3478f6;color:white;font-weight:600;font:inherit}
+    button:disabled{opacity:.55;cursor:not-allowed}.secondary{background:#eaf1fc;color:#1858b5}.danger{background:#fff0ef;color:#b33232}
+    .hidden{display:none!important}.status{min-height:24px;margin:12px 0 0}.status.error{color:#ad2e31}.status.success{color:#137e51}
+    .chart-container{height:330px;position:relative}pre{background:#f1f4f8;padding:16px;border-radius:9px;overflow:auto;max-height:350px;font-size:12px}
+    .history-item{border:1px solid #e4eaf3;border-radius:12px;padding:18px;margin:12px 0}.history-item h3{margin:0 0 4px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.history-detail{margin-top:12px}
+    .stats,.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px;margin:18px 0}
+    .stat,.metric{padding:14px;border:1px solid #e7ebf2;border-radius:10px}.stat strong,.metric strong{display:block;font-size:21px}.stat small,.metric small{color:#607089}
+    .personal-bests{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:12px;margin:14px 0 24px}
+    .personal-best{padding:17px;border:1px solid #e7ebf2;border-radius:12px;background:#fff}
+    .personal-best .race-name{display:block;font-weight:650;color:#243755}
+    .personal-best strong{display:block;font-size:clamp(23px,3vw,30px);margin:6px 0 0;font-variant-numeric:tabular-nums}
+    .personal-best small{display:block;color:#607089;font-size:13px;margin-top:4px}
+    .personal-best .best-pace{font-size:15px;color:#263c5f;font-weight:600;margin-top:8px;font-variant-numeric:tabular-nums}
+    .table-scroll{overflow-x:auto}.split-table{width:100%;border-collapse:collapse;margin:12px 0}.split-table th,.split-table td{border-bottom:1px solid #e1e8f0;padding:8px;text-align:left}.split-table input{width:100%;min-width:72px}.split-table td:first-child input{min-width:55px;width:75px}
+    .review-field input,.review-field select{width:100%}.review-field small{display:block;color:#607089}.chart-panel{margin:12px 0;padding:16px}.warning-text{color:#9a5a02}.upload-hint{font-size:14px;margin:5px 0 16px}.tip{border-left:3px solid #3478f6;padding:9px 13px;background:#edf4ff;border-radius:3px}
+    button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #8db8ff}
+    @media(max-width:600px){.card{padding:18px}.chart-container{height:260px}}
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Running Analyzer</h1>
+    <p class="subtitle">Upload workout details and mile-by-mile splits together. Save one workout, view pace and heart-rate graphs.</p>
+    <nav class="tabs" aria-label="Sections">
+      <button type="button" class="tab active" data-view="workoutView">Upload Workout</button>
+      <button type="button" class="tab" data-view="historyView">Workout History</button>
+    </nav>
+
+    <section id="workoutView">
+      <div class="card">
+        <h2>Upload Workout + Splits</h2>
+        <p class="muted">Upload the workout overview plus <strong>one or two splits screenshots</strong> from the same workout.</p>
+        <form id="workoutForm">
+          <label for="detailsImage">1. Workout Details screenshot</label>
+          <input id="detailsImage" type="file" accept="image/jpeg,image/png" required>
+          <p class="muted upload-hint">Workout time, distance, calories, elevation, average pace and heart rate.</p>
+          <label for="splitsImage">2. Splits screenshots (optional — select 1 or 2)</label>
+          <input id="splitsImage" type="file" accept="image/jpeg,image/png" multiple>
+          <p class="muted upload-hint">Select up to two screenshots together (Cmd-click to select both). Screenshots can show ANY mile numbers, overlap, or arrive in any order. Missing and conflicting rows are flagged for review.</p>
+          <div class="row">
+            <div><label for="workoutDate">Workout date</label><input type="date" id="workoutDate" required></div>
+            <div><label for="workoutEnvironment">Environment</label><select id="workoutEnvironment"><option value="auto">Use screenshot (if recognized)</option><option value="Outdoor">Outdoor</option><option value="Indoor">Indoor</option><option value="Back Walk">Back Walk</option></select></div>
+          </div>
+          <p class="tip">Your classification: average pace <strong>15:00 min/mi or slower = Walk</strong>; faster = Run. Indoor/Outdoor is preserved. Selecting <strong>Back Walk</strong> keeps that activity regardless of pace.</p>
+          <button id="saveWorkoutBtn" type="submit">Extract &amp; Review</button>
+        </form>
+        <p id="uploadStatus" class="status" role="status"></p>
+      </div>
+
+      <section id="reviewSection" class="card hidden" aria-label="Review extracted workout">
+        <h2>Review OCR Before Saving</h2>
+        <p class="muted">Correct the details and every split row. Nothing is stored until you click Save Reviewed Workout.</p>
+        <p class="tip" id="reviewWarnings"></p>
+        <form id="reviewForm">
+          <div class="row" id="reviewFields"></div>
+          <h3>Recognized Splits</h3>
+          <p class="muted">Split numbers come from the screenshots, not their upload order. Add missing rows or edit OCR errors.</p>
+          <div class="table-scroll"><table class="split-table"><thead><tr><th>Mile #</th><th>Split time (MM:SS)</th><th>Pace (MM:SS)</th><th>Heart rate</th><th></th></tr></thead><tbody id="reviewSplits"></tbody></table></div>
+          <div class="actions"><button type="button" class="secondary" id="addSplitBtn">+ Add split</button><button type="submit" id="confirmSaveBtn">Save Reviewed Workout</button><button type="button" class="secondary" id="cancelReviewBtn">Cancel review</button></div>
+        </form>
+      </section>
+
+      <section id="workoutResults" class="hidden" aria-label="Workout extraction results">
+        <div class="card">
+          <h2 id="workoutResultTitle">Workout Details</h2>
+          <p class="muted" id="workoutResultSubtitle"></p>
+          <div class="metrics" id="workoutMetrics"></div>
+        </div>
+        <div id="graphsContainer" class="hidden">
+          <div class="card"><h2>Pace vs. Distance</h2><div class="chart-container"><canvas id="paceChart"></canvas></div></div>
+          <div class="card"><h2>Heart Rate vs. Distance</h2><div class="chart-container"><canvas id="heartRateChart"></canvas></div></div>
+        </div>
+        <div class="card">
+          <h2>Workout JSON</h2>
+          <p class="muted">Check OCR values against your screenshot, especially time and partial-mile splits.</p>
+          <button type="button" id="downloadBtn" class="secondary">Download Workout JSON</button>
+          <pre id="jsonOutput"></pre>
+        </div>
+      </section>
+    </section>
+
+    <section id="historyView" class="hidden">
+      <div class="card">
+        <h2>Workout History</h2>
+        <p class="muted">Saved in a local SQLite database on your computer. Export backups regularly; this is not cloud sync.</p>
+        <div class="stats">
+          <div class="stat"><strong id="historyCount">0</strong><small>Saved workouts</small></div>
+          <div class="stat"><strong id="historyDistance">0 mi</strong><small>Total recorded distance</small></div>
+        </div>
+        <h3>Personal Bests</h3>
+        <p class="muted">Recorded full-workout times or split-derived estimates are clearly labeled. Calculations never invent missing mile data.</p>
+        <div class="personal-bests" id="personalBests" aria-live="polite">
+          <div class="personal-best"><span class="race-name">5K</span><strong id="best5k">—</strong><small id="best5kDate">3.11 miles · No qualifying workout yet</small></div>
+          <div class="personal-best"><span class="race-name">10K</span><strong id="best10k">—</strong><small id="best10kDate">6.21 miles · No qualifying workout yet</small></div>
+          <div class="personal-best"><span class="race-name">Half Marathon</span><strong id="bestHalf">—</strong><small id="bestHalfDate">13.11 miles · No qualifying workout yet</small></div>
+          <div class="personal-best"><span class="race-name">Full Marathon</span><strong id="bestFull">—</strong><small id="bestFullDate">26.22 miles · No qualifying workout yet</small></div>
+        </div>
+        <h3>Average Training Current Pace</h3>
+        <p class="muted">Your average running pace from up to 5 most recent saved Run workouts near each distance. Walk and Back Walk are excluded.</p>
+        <div class="personal-bests" id="trainingPaces" aria-live="polite">
+          <div class="personal-best"><span class="race-name">5K</span><strong id="training5k">—</strong><small id="training5kInfo">3.11 miles · No qualifying runs yet</small></div>
+          <div class="personal-best"><span class="race-name">10K</span><strong id="training10k">—</strong><small id="training10kInfo">6.21 miles · No qualifying runs yet</small></div>
+          <div class="personal-best"><span class="race-name">Half Marathon</span><strong id="trainingHalf">—</strong><small id="trainingHalfInfo">13.11 miles · No qualifying runs yet</small></div>
+          <div class="personal-best"><span class="race-name">Full Marathon</span><strong id="trainingFull">—</strong><small id="trainingFullInfo">26.22 miles · No qualifying runs yet</small></div>
+        </div>
+        <h3>Training Analytics</h3>
+        <p class="muted">Running is counted separately from Walk and Back Walk. Weekly totals use Monday–Sunday, based on saved workout dates.</p>
+        <div class="row">
+          <div><label for="analyticsWeeks">Time range</label><select id="analyticsWeeks"><option value="4">Last 4 weeks</option><option value="8" selected>Last 8 weeks</option><option value="12">Last 12 weeks</option><option value="26">Last 26 weeks</option></select></div>
+        </div>
+        <div class="stats" id="trainingStats"></div>
+        <div class="card chart-panel"><h3>Weekly Distance by Activity</h3><div class="chart-container"><canvas id="weeklyDistanceChart"></canvas></div></div>
+        <div class="card chart-panel"><h3>Running Pace Trend</h3><p class="muted">Each dot is the average pace of a saved Run workout.</p><div class="chart-container"><canvas id="paceTrendChart"></canvas></div></div>
+        <h3>Saved Workouts</h3>
+        <div id="historyList"></div>
+        <div class="actions">
+          <button type="button" class="secondary" id="exportHistoryBtn">Export All JSON</button>
+          <button type="button" class="secondary" id="importHistoryBtn">Import JSON Backup</button>
+          <input type="file" accept="application/json,.json" id="importHistoryFile" class="hidden">
+          <button type="button" class="danger" id="clearHistoryBtn">Clear All History</button>
+        </div>
+        <p id="historyStatus" class="status" role="status"></p>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
